@@ -11,9 +11,7 @@ import java.util.Date;
 public class TaskUpdateDTO {
     private String description;
     private String deadline;
+    @Getter
     private boolean completed;
 
-    public boolean getCompleted() {
-        return this.completed;
-    }
 }

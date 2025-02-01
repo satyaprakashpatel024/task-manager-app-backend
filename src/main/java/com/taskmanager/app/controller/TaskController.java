@@ -5,8 +5,14 @@ import com.taskmanager.app.dto.ErrorResponseDTO;
 import com.taskmanager.app.dto.TaskRequestDTO;
 import com.taskmanager.app.dto.TaskResponseDTO;
 import com.taskmanager.app.dto.TaskUpdateDTO;
+
+import com.taskmanager.app.entity.NoteEntity;
 import com.taskmanager.app.entity.TaskEntity;
+
+import com.taskmanager.app.services.NoteService;
 import com.taskmanager.app.services.TaskService;
+
+import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,21 +24,26 @@ import java.util.List;
 @RequestMapping("/api/v1/task")
 public class TaskController {
 
-    private TaskService taskService;
+    private final TaskService taskService;
+    private final NoteService noteService;
+    private ModelMapper modelMapper = new ModelMapper();
 
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, NoteService noteService) {
         this.taskService = taskService;
+        this.noteService = noteService;
     }
 
     @GetMapping("")
     public ResponseEntity<List<TaskEntity>> getTasks() {
-        return ResponseEntity.ok(this.taskService.getAllTasks());
+        List<TaskEntity> task = this.taskService.getAllTasks();
+        return ResponseEntity.ok(task);
     }
 
     @PostMapping("")
     public ResponseEntity<TaskResponseDTO> addTask(@RequestBody TaskRequestDTO body) throws ParseException {
         TaskEntity r = this.taskService.addTask(body.getTitle(),body.getDescription(),body.getDeadline());
         TaskResponseDTO resp = new TaskResponseDTO();
+        resp.setId(r.getId());
         resp.setTitle(r.getTitle());
         resp.setDescription(r.getDescription());
         resp.setDeadline(r.getDeadline());
@@ -40,19 +51,20 @@ public class TaskController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TaskResponseDTO> getTaskById(@PathVariable int id){
-        TaskEntity r = this.taskService.getTaskById(id);
-        TaskResponseDTO resp = new TaskResponseDTO();
-        resp.setTitle(r.getTitle());
-        resp.setDescription(r.getDescription());
-        resp.setDeadline(r.getDeadline());
-        resp.setCompleted(r.getCompleted());
-        return ResponseEntity.ok(resp);
+    public ResponseEntity<TaskResponseDTO> getTaskById(@PathVariable("id") int id){
+        TaskEntity task = this.taskService.getTaskById(id);
+        List<NoteEntity> list = noteService.getNotesForTask(id);
+        if(task==null){
+            return ResponseEntity.notFound().build();
+        }
+        TaskResponseDTO data = modelMapper.map(task,TaskResponseDTO.class);
+        data.setNotes(list);
+        return ResponseEntity.ok(data);
     }
 
     @PatchMapping("/update/{id}")
     public ResponseEntity<TaskResponseDTO> updateTask(@RequestBody TaskUpdateDTO body, @PathVariable int id) throws Exception {
-        TaskEntity task = this.taskService.updateTask(id,body.getDescription(),body.getDeadline(),body.getCompleted());
+        TaskEntity task = this.taskService.updateTask(id,body.getDescription(),body.getDeadline(),body.isCompleted());
         if(task==null){
             throw new Exception("invalid task id.");
         }
@@ -60,7 +72,7 @@ public class TaskController {
         t.setTitle(task.getTitle());
         t.setDeadline(task.getDeadline());
         t.setDescription(task.getDescription());
-        t.setCompleted(task.getCompleted());
+        t.setCompleted(task.isCompleted());
         return ResponseEntity.accepted().body(t);
     }
 
